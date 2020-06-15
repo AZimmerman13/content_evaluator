@@ -8,6 +8,7 @@ __pycache__/
 *.csv
 *.json
 *.jsonl
+.DS_Store
 
 data/img/
 
