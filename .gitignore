@@ -9,6 +9,7 @@ __pycache__/
 *.json
 *.jsonl
 .DS_Store
+.gitignore
 
 data/img/
 
