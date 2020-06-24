@@ -25,6 +25,7 @@ Imagine an image with the caption "Look at all the things I love about you"
 if the image itself was a barren desert landscape, the model ought to predict a different outcome than if the image showed something more positive.
 
 ## NLP
+### **voting approach**
 
 I started with a Multinomial Naive bayes model
 
@@ -39,3 +40,15 @@ AUC: 0.9655263648668972
 
 [[5109  341]
  [ 702 2348]]
+
+
+### **clustering approach**
+
+KMEANS
+
+Train accuracy: 0.6767058823529412
+
+AUC: 0.6217229057001054
+
+[[5057  393]
+ [2355  695]]
