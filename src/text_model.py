@@ -62,40 +62,40 @@ def test_thresholds(fit_model):
 
 
 def blobify(df):
+    '''
+    adds a feature to the given dataframe that contains a
+    TextBlob polarity score for the te
+    '''
     sent = [TextBlob(str(i)).polarity for i in df.text]
     df['blob_polarity'] = sent
     return df
+
  # Try CalibratedClassifierCV 
  # Try textblob
  # Show wordcloud for each category
 
  # predict_proba values only between 0.47 and 0.53
 if __name__ == '__main__':
+    # instantiate vectorizer
+    tfidf = TfidfVectorizer(stop_words ='english', tokenizer=wordnet_lemmetize_tokenize, max_features=5000)
+    # Load and tranform data
     train  = pd.read_json('data/train.jsonl', lines=True)
-    #playing with some options
     train_df = train.copy()
-    # sent = [TextBlob(str(i)).polarity for i in train_df.text]
-    # train_df['blob_sent'] = sent
     train_df = blobify(train_df)
 
-
-    test = pd.read_json('data/dev.jsonl', lines=True)
-    test_df = test.copy()
-    test_df = blobify(test_df)
-    tfidf = TfidfVectorizer(stop_words ='english', tokenizer=wordnet_lemmetize_tokenize, max_features=5000)
-    count_vec = CountVectorizer(stop_words='english', tokenizer=wordnet_lemmetize_tokenize)
-    
     tfidf_train = tfidf.fit_transform(train.text.values)
     train_df['vector'] = list(tfidf_train.toarray())
     X_train = np.array(train_df.iloc[:,-2]).reshape(-1,1)
-    # tfidf_train = count_vec.fit_transform(train.text.values)
+    y_train = train.label.values
+
+    # Load and transform test data
+    test = pd.read_json('data/dev.jsonl', lines=True)
+    test_df = test.copy()
+    test_df = blobify(test_df)
+    
     tfidf_test = tfidf.transform(test.text.values)
     test_df['vector'] = list(tfidf_test.toarray())
     X_test = np.array(test_df.iloc[:,-2]).reshape(-1,1)
-    # tfidf_test = count_vec.transform(test.text.values)
-    # X_train = train.text.values
-    y_train = train.label.values
-    # X_test = test.text.values
     y_test = test.label.values.reshape(-1,1)
 
     # Featurize text
