@@ -7,6 +7,7 @@
 
 import numpy as np
 import pandas as pd
+from time import time
 
 from sklearn.model_selection import train_test_split
 from skimage.io import imread
@@ -21,8 +22,7 @@ def load_and_featurize_data(image_size, df, img_col):
         img = imread(f'data/{i}')
         img = resize(img, image_size)
         out_lst.append(image_to_vector(img))
-        # breakpoint()
-        print(i)
+        # print(i)
     return np.array(out_lst)
 
 def image_to_vector(image):
@@ -40,14 +40,20 @@ if __name__ == '__main__':
 
     train  = pd.read_json('data/train.jsonl', lines=True)
     validate = pd.read_json('data/dev.jsonl', lines=True)
-    train_sample = train.sample(10, random_state=13).reset_index(drop=True)
-
+    sample_size = 1000
+    train_sample = train.sample(1000, random_state=13).reset_index(drop=True)
+    ts = time()
     img_array = load_and_featurize_data((16,16,3), train_sample, 'img')
+    img_array = img_array.reshape(sample_size,768)
+    tp1 = time()
+    print('Image processing took {} seconds'.format(tp1-ts))
 
-    # tfidf = TfidfVectorizer(stop_words ='english', tokenizer=wordnet_lemmetize_tokenize, max_features=1000)
-    # pipeline = ImagePipeline('data/img')
-    # 
-    # df = pd.read_pickle('data/pickled_data')
+    vc = TfidfVectorizer(stop_words ='english', tokenizer=wordnet_lemmetize_tokenize, max_features=1000)
+    tfidf_train = vc.fit_transform(train_sample.text.values)
+    tp2 = time()
+    print('Vectorizing took {} seconds'.format(tp2-tp1))
+
+    X = np.hstack((tfidf_train.todense(),img_array))
+    y = train_sample.label
+
     
-
-    # train['image_vec'] = img_array
