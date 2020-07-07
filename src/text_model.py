@@ -20,7 +20,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.cluster import DBSCAN, KMeans
 
-from textblob import TextBlob
+# from textblob import TextBlob
 
 plt.style.use('fivethirtyeight')
 
@@ -81,7 +81,7 @@ if __name__ == '__main__':
     # Load and tranform data
     train  = pd.read_json('data/train.jsonl', lines=True)
     train_df = train.copy()
-    train_df = blobify(train_df)
+    # train_df = blobify(train_df)
 
     tfidf_train = tfidf.fit_transform(train.text.values)
     train_df['vector'] = list(tfidf_train.toarray())
@@ -91,7 +91,7 @@ if __name__ == '__main__':
     # Load and transform test data
     test = pd.read_json('data/dev.jsonl', lines=True)
     test_df = test.copy()
-    test_df = blobify(test_df)
+    # test_df = blobify(test_df)
     
     tfidf_test = tfidf.transform(test.text.values)
     test_df['vector'] = list(tfidf_test.toarray())
@@ -120,7 +120,7 @@ if __name__ == '__main__':
 
 
 
-    random_forest = True
+    random_forest = False
     if random_forest:
         rf = RandomForestClassifier(oob_score=True, n_jobs=-1, class_weight='balanced', max_depth=3)
         rf.fit(X_train, y_train)

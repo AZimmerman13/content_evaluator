@@ -236,6 +236,7 @@ class ImagePipeline(object):
         row_tup = tuple(img_arr.ravel()[np.newaxis, :]
                         for img_lst in self.img_lst2 for img_arr in img_lst)
         self.test = row_tup
+        breakpoint()
         self.features = np.r_[row_tup]
 
     def _vectorize_labels(self):
