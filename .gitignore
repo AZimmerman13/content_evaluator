@@ -10,6 +10,7 @@ __pycache__/
 *.jsonl
 .DS_Store
 .gitignore
+*.pkl
 
 data/img/
 
