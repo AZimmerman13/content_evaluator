@@ -47,11 +47,52 @@ def load_and_featurize_data(filepath, image_size, savePickle=False, outpath=None
 
     #breakpoint()
     X = np.hstack((tfidf_data.todense(),img_array))
-    y = data.label.values
+    try:
+        y = data.label.values
+    except AttributeError:
+        y = np.ndarray([0,0,0])
     
     if savePickle:
         np.save(outpath,np.hstack((y.reshape(-1,1),X)))
-    return X, y 
+    return X, y, vc
+
+def load_test_data(filepath, image_size, vc, savePickle=False, outpath=None, sample_size=-1):
+    df  = pd.read_json(filepath, lines=True)
+    out_lst=[]
+    ts = time()
+    if sample_size>0:
+        print("Taking Sample")
+        data = df.sample(sample_size, random_state=13).reset_index(drop=True)
+    else:
+        print("Taking All Data")
+        data = df
+
+    for i in data.img:
+        img = imread('data/{}'.format(i))
+        img = resize(img, image_size)
+        out_lst.append(image_to_vector(img))
+        print(i)
+
+    data_size = data.shape[0]
+    img_array = np.array(out_lst).reshape(data_size,image_size[0]*image_size[1]*image_size[2])
+    #img_array = img_array.reshape(sample_size,768)
+    tp1 = time()
+    print('Image processing took {} seconds'.format(tp1-ts))
+
+    tfidf_data = vc.transform(data.text.values)
+    tp2 = time()
+    print('Vectorizing took {} seconds'.format(tp2-tp1))
+
+    #breakpoint()
+    X = np.hstack((tfidf_data.todense(),img_array))
+    try:
+        y = data.label.values
+    except AttributeError:
+        y = np.ndarray([0,0,0])
+    
+    if savePickle:
+        np.save(outpath,np.hstack(X))
+    return X
 
 def image_to_vector(image):
     """
@@ -68,13 +109,24 @@ if __name__ == '__main__':
 
     img_size = (16,16,3)
     sample_size = -1
+    training = True
+    validating = True
+    testing = True
 
     # validate = pd.read_json('data/dev.jsonl', lines=True)
     # submission = pd.read_json('data/test.jsonl', lines=True)
+    if training:
+        X, y, tfidf = load_and_featurize_data('data/train.jsonl', image_size=img_size, savePickle=True, outpath = 'data/train', sample_size=sample_size)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42, stratify=y)
 
-    X, y = load_and_featurize_data('data/train.jsonl', image_size=img_size, savePickle=True, outpath = 'data/train', sample_size=sample_size)
+    if validating:
+        X, y, tfidf = load_and_featurize_data('data/dev.jsonl', image_size=img_size, savePickle=True, outpath = 'data/validate', sample_size=sample_size)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42, stratify=y)
+    
+    if testing:
+        X = load_test_data('data/test.jsonl', image_size=img_size, savePickle=True, outpath = 'data/test', sample_size=sample_size, vc=tfidf)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42, stratify=y)
+    
     
 
 

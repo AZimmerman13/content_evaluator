@@ -81,7 +81,7 @@ if __name__ == '__main__':
     # validate = pd.read_json('data/dev.jsonl', lines=True)
     # submission = pd.read_json('data/test.jsonl', lines=True)
 
-    data = np.load('data/train_sample.npy')
+    data = np.load('data/train.npy')
     y = data[:,0]
     X = data[:, 1:] 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42, stratify=y)
@@ -108,5 +108,33 @@ if __name__ == '__main__':
         te= time()
         print('ROC AUC: %.3f' % score)
         print("Time passed:", te-ts)
+
+    testing= True
+    if testing:
+        submission = pd.DataFrame(columns=['id', 'proba', 'label'])
+        test = np.load('data/test.npy')
+        X_testing = test[:,1:]
+        std = scaler.transform(X_testing)
+        yhat = model.predict(std)
+        y_proda = model.predict_probas(std)
+        submission.id = test.img
+        submission.proba = y_proba
+        submission.label = yhat
+        submission.to_csv('data/submission.csv')
+
+    validating = True
+    if validating:
+        validate_data = np.load('data/validate.npy')
+        X_valid = validate_data[:,1:]
+        y_valid = validate_data[:,0]
+        X_valid_std = scaler.transform(X_valid)
+
+        yhat = model.predict(X_valid_std)
+        score = roc_auc_score(y_valid, yhat)
+        te= time()
+        print("\n\n\n\nValidation Set:\n\n")
+        print('ROC AUC: %.3f' % score)
+        print("Time passed:", te-ts)
+
 
     
