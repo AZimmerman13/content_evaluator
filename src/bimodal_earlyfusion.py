@@ -101,7 +101,7 @@ if __name__ == '__main__':
 
         n_input = X_std.shape[1]
         model = define_mlp_model(n_input)
-        model.fit(X_std, y_train, epochs=30, batch_size=2048, verbose=2, 
+        model.fit(X_std, y_train, epochs=100, batch_size=2048, verbose=2, 
                 validation_data=(X_test_std, y_test), class_weight=weights)
         yhat = model.predict(X_test_std)
         score = roc_auc_score(y_test, yhat)
@@ -109,18 +109,6 @@ if __name__ == '__main__':
         print('ROC AUC: %.3f' % score)
         print("Time passed:", te-ts)
 
-    testing= True
-    if testing:
-        submission = pd.DataFrame(columns=['id', 'proba', 'label'])
-        test = np.load('data/test.npy')
-        X_testing = test[:,1:]
-        std = scaler.transform(X_testing)
-        yhat = model.predict(std)
-        y_proda = model.predict_probas(std)
-        submission.id = test.img
-        submission.proba = y_proba
-        submission.label = yhat
-        submission.to_csv('data/submission.csv')
 
     validating = True
     if validating:
@@ -128,7 +116,6 @@ if __name__ == '__main__':
         X_valid = validate_data[:,1:]
         y_valid = validate_data[:,0]
         X_valid_std = scaler.transform(X_valid)
-
         yhat = model.predict(X_valid_std)
         score = roc_auc_score(y_valid, yhat)
         te= time()
@@ -137,4 +124,19 @@ if __name__ == '__main__':
         print("Time passed:", te-ts)
 
 
-    
+    testing= True
+    if testing:
+        df = pd.read_json('data/test.jsonl', lines=True)
+        submission = pd.DataFrame(columns=['id', 'proba', 'label'])
+        test = np.load('data/test.npy')
+        X_testing = test
+        std = scaler.transform(X_testing)
+        thresh = .5
+
+        yhat = (thresh <= model.predict(std)).astype(int)
+        y_proba = model.predict_proba(std)
+        submission.id = df.id
+        submission.proba = y_proba
+        submission.label = yhat
+        submission.set_index('id', inplace=True)
+        submission.to_csv('data/submission.csv')

@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from time import time
 import nltk
+import pickle
 #nltk.download('wordnet')
 from sklearn.model_selection import train_test_split
 from skimage.io import imread
@@ -42,6 +43,7 @@ def load_and_featurize_data(filepath, image_size, savePickle=False, outpath=None
 
     vc = TfidfVectorizer(stop_words ='english', tokenizer=wordnet_lemmetize_tokenize, max_features=1000)
     tfidf_data = vc.fit_transform(data.text.values)
+    pickle.dump(vc, open('data/tfidf.pickle','wb'))
     tp2 = time()
     print('Vectorizing took {} seconds'.format(tp2-tp1))
 
@@ -85,14 +87,16 @@ def load_test_data(filepath, image_size, vc, savePickle=False, outpath=None, sam
 
     #breakpoint()
     X = np.hstack((tfidf_data.todense(),img_array))
+    
     try:
         y = data.label.values
+        if savePickle:
+            np.save(outpath,np.hstack((y.reshape(-1,1),X)))
     except AttributeError:
         y = np.ndarray([0,0,0])
-    
-    if savePickle:
-        np.save(outpath,np.hstack(X))
-    return X
+        if savePickle:
+            np.save(outpath,X)
+    return X, y
 
 def image_to_vector(image):
     """
@@ -109,22 +113,23 @@ if __name__ == '__main__':
 
     img_size = (16,16,3)
     sample_size = -1
-    training = True
-    validating = True
+    training = False
+    validating = False
     testing = True
 
     # validate = pd.read_json('data/dev.jsonl', lines=True)
     # submission = pd.read_json('data/test.jsonl', lines=True)
     if training:
         X, y, tfidf = load_and_featurize_data('data/train.jsonl', image_size=img_size, savePickle=True, outpath = 'data/train', sample_size=sample_size)
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42, stratify=y)
+
+    with open('data/tfidf.pickle', 'rb') as fp:
+        tfidf = pickle.load(fp)    
 
     if validating:
-        X, y, tfidf = load_and_featurize_data('data/dev.jsonl', image_size=img_size, savePickle=True, outpath = 'data/validate', sample_size=sample_size)
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42, stratify=y)
+        X, y = load_test_data('data/dev.jsonl', image_size=img_size, savePickle=True, outpath = 'data/validate', sample_size=sample_size, vc=tfidf)
     
     if testing:
-        X = load_test_data('data/test.jsonl', image_size=img_size, savePickle=True, outpath = 'data/test', sample_size=sample_size, vc=tfidf)
+        X, _ = load_test_data('data/test.jsonl', image_size=img_size, savePickle=True, outpath = 'data/test', sample_size=sample_size, vc=tfidf)
 
     
     
