@@ -36,6 +36,19 @@ def get_weights(y_train):
     weight_for_1 = 1.0/counts
     return weight_for_0, weight_for_1
 
+def thresh_test(thresh_list):
+    for i in thresh_list:
+            model = define_mlp_model(n_input)
+            model.fit(X_std, y_train, epochs=30, batch_size=2048, verbose=2, 
+                    validation_data=(X_test_std, y_test), class_weight=weights)
+            yhat = model.predict(X_test_std)
+            yhat = (yhat >= i).astype(int)
+
+
+            score = roc_auc_score(y_test, yhat)
+            print("With a threshold of {}:\n".format(i))
+            print('ROC AUC: %.3f' % score)
+
 def define_mlp_model(n_input):
     """ 
         define the multi-layer-perceptron neural network
@@ -45,7 +58,7 @@ def define_mlp_model(n_input):
         a defined mlp model, not fitted
     """
     model = Sequential()
-    num_neurons = 256
+    num_neurons = 64  #256
 
     # hidden layer
     model.add(Dense(units=num_neurons,
@@ -100,13 +113,19 @@ if __name__ == '__main__':
         weights ={0:weight_for_0, 1:weight_for_1}
 
         n_input = X_std.shape[1]
+        thresh_list = np.arange(.1,1,.05)
+        thresh = False
+        if thresh:
+            thresh_test(thresh_list)
         model = define_mlp_model(n_input)
-        model.fit(X_std, y_train, epochs=100, batch_size=2048, verbose=2, 
-                validation_data=(X_test_std, y_test), class_weight=weights)
+        model.fit(X_std, y_train, epochs=30, batch_size=512, verbose=2, 
+                    validation_data=(X_test_std, y_test), class_weight=weights)
         yhat = model.predict(X_test_std)
+        # yhat = (yhat >= 0.6).astype(int)
         score = roc_auc_score(y_test, yhat)
+
         te= time()
-        print('ROC AUC: %.3f' % score)
+        print('\n\nROC AUC: %.3f' % score)
         print("Time passed:", te-ts)
 
 
@@ -124,7 +143,7 @@ if __name__ == '__main__':
         print("Time passed:", te-ts)
 
 
-    testing= True
+    testing= False
     if testing:
         df = pd.read_json('data/test.jsonl', lines=True)
         submission = pd.DataFrame(columns=['id', 'proba', 'label'])
