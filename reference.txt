@@ -1,0 +1,8 @@
+Multimodal Tensor Fusion Network:
+https://arxiv.org/abs/1707.07250
+
+https://github.com/Justin1904/TensorFusionNetworks/blob/master/model.py
+https://github.com/A2Zadeh/CMU-MultimodalSDK/tree/master/mmsdk/mmmodelsdk/fusion/tensor_fusion
+
+Multimodal Machine Learning
+https://github.com/pliang279/awesome-multimodal-ml#language-and-visual-qa
