@@ -6,13 +6,17 @@ from sklearn.model_selection import train_test_split
 from skimage import io, color, filters, restoration, feature
 from skimage.io import imread
 from skimage.transform import resize, rotate
+from sklearn.metrics import roc_auc_score
 
 from tensorflow import keras
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Activation, Flatten, Conv2D, MaxPooling2D
 from tensorflow.keras.optimizers import SGD, RMSprop, Adam
+from tensorflow.keras.metrics import FalseNegatives, FalsePositives, TrueNegatives, TruePositives, Precision, Recall
 from tensorflow.keras.preprocessing.image import ImageDataGenerator, load_img, array_to_img, img_to_array
 import os
+
+from src.bimodal_earlyfusion import get_weights
 
 def load_data(filepath, image_size, saveData=False, outpath=None, sample_size=-1):
     df = pd.read_json(filepath, lines=True)
@@ -80,13 +84,14 @@ def compile_model(model, optimizer, metrics):
     return model
 
 def train_model(model, data_aug, batch_size, epochs,
-                X_train, X_test, y_train, y_test):
+                X_train, X_test, y_train, y_test, weights):
     if not data_aug:
         print('No data augmentation.')
         model.fit(X_train, y_train, 
                   batch_size=batch_size,
                   epochs=epochs,
                   validation_data=(X_test, y_test),
+                  class_weight=weights,
                   shuffle=True)
     else:
         print('Using real-time data augmentation.')
@@ -96,13 +101,14 @@ def train_model(model, data_aug, batch_size, epochs,
                                      shear_range=0.2,
                                      horizontal_flip=True,
                                      vertical_flip=False, 
-                                     fill_model='nearest')
+                                     fill_mode='nearest')
         datagen.fit(X_train)
-        model.fit_generator(datagen.flow(X_train,y_train,batch_size=batch_size),
+        model.fit_generator(datagen.flow(X_train,y_train, batch_size=batch_size),
                                          epochs=epochs,
                                          validation_data=(X_test, y_test),
                                          workers=-1,
-                                         steps_per_epoch=len(X_train) // batch_size, 
+                                         steps_per_epoch=len(X_train) // batch_size,
+                                         class_weight=weights, 
                                          use_multiprocessing=True)
     return model
 
@@ -126,8 +132,8 @@ if __name__ == "__main__":
 
     image_size = (32,32,3)
     sample_size = -1
-    batch_size = 32
-    epochs = 3
+    batch_size = 100
+    epochs = 5
     data_aug = True
 
     if process_data:
@@ -137,22 +143,43 @@ if __name__ == "__main__":
 
     if cnn_model:
         metrics = ['accuracy']
+        # metrics = [FalseNegatives(name='fn'),
+        #     FalsePositives(name='fp'),
+        #     TrueNegatives(name='tn'),
+        #     TruePositives(name='tp'),
+        #     Precision(name='precision'),
+        #     Recall(name='recall'),
+        #     Accuracy(name='accuracy'),
+        # ]
         save_dir = os.path.join(os.getcwd(), 'models')
         model_name = 'keras_cnn.model.h5'
-        gd_optimizer = SGD(lr=1e-4, momentum=0.9)
+        optimizer = Adam(1e-2)
+        #optimizer = SGD(lr=1e-4, momentum=0.9)
 
         X = np.load('data/train_cnn_feature.npy')
         y = np.load('data/train_cnn_target.npy')
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42, stratify=y)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+        ### Building and tuning a neural network model
+        weight_for_0, weight_for_1 = get_weights(y_train)
+        weights ={0:weight_for_0, 1:weight_for_1}
+
         input_shape = X_train.shape[1:]
 
         model = define_model(input_shape)
 
-        model = compile_model(model, gd_optimizer, metrics)
+        model = compile_model(model, optimizer, metrics)
 
-        model = train_test_split(model, data_aug, batch_size, epochs,
-                                X_train, X_test, y_train, y_test)
+        model = train_model(model, data_aug, batch_size, epochs,
+                                X_train, X_test, y_train, y_test, weights)
         
-        save_model(model, save_dir, model_name)
-
         evaluate_model(model, X_test, y_test)
+
+        X_val = np.load('data/val_cnn_feature.npy')
+        y_val = np.load('data/val_cnn_target.npy')
+
+        y_hat = model.predict(X_val)
+        score = roc_auc_score(y_val, y_hat)
+        print('\n\nROC AUC: %.3f' % score)
+
+        save_model(model, save_dir, model_name)
