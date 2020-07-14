@@ -181,7 +181,7 @@ if __name__ == '__main__':
     print("AUC SCORE ON CROSS VALIDATION:\n {}".format(cv_auc))
     print("\n\nAUC SCORE ON HOLDOUT:\n {}".format(val_auc))
 
-    testing = False
+    testing = True
     if testing:
 
         sub_df = pd.read_json('data/test.jsonl', lines=True)
@@ -199,3 +199,4 @@ if __name__ == '__main__':
         submission.proba = y_proba
         submission.label = yhat
         submission.set_index('id', inplace=True)
+        submission.to_csv('data/lstm_submission.csv')
