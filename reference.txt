@@ -6,3 +6,6 @@ https://github.com/A2Zadeh/CMU-MultimodalSDK/tree/master/mmsdk/mmmodelsdk/fusion
 
 Multimodal Machine Learning
 https://github.com/pliang279/awesome-multimodal-ml#language-and-visual-qa
+
+Original challenge article
+https://arxiv.org/pdf/2005.04790.pdf

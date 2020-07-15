@@ -28,6 +28,7 @@ def load_data(filepath, image_size, saveData=False, outpath=None, sample_size=-1
     else:
         print('Taking All Train Data')
         data = df
+    # Converted the following for loop to a list comprehension. 
     # for i in data.img:
     #     img = imread('data/{}'.format(i))
     #     img = resize(img, image_size)
@@ -153,8 +154,8 @@ if __name__ == "__main__":
         # ]
         save_dir = os.path.join(os.getcwd(), 'models')
         model_name = 'keras_cnn.model.h5'
-        optimizer = Adam(1e-2)
-        #optimizer = SGD(lr=1e-4, momentum=0.9)
+        #optimizer = Adam(1e-2)
+        optimizer = SGD(lr=1e-4, momentum=0.9)
 
         X = np.load('data/train_cnn_feature.npy')
         y = np.load('data/train_cnn_target.npy')
@@ -175,11 +176,15 @@ if __name__ == "__main__":
         
         evaluate_model(model, X_test, y_test)
 
+        y_t_hat = model.predict(X_test)
+        score = roc_auc_score(y_test, y_t_hat)
+        print('\nTest ROC AUC: %.3f' % score)
+
         X_val = np.load('data/val_cnn_feature.npy')
         y_val = np.load('data/val_cnn_target.npy')
 
         y_hat = model.predict(X_val)
         score = roc_auc_score(y_val, y_hat)
-        print('\n\nROC AUC: %.3f' % score)
+        print('\nValidation ROC AUC: %.3f' % score)
 
         save_model(model, save_dir, model_name)
