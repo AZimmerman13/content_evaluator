@@ -139,26 +139,64 @@ def define_lstm(TOP_WORDS, max_sent_len):
     return model
 
 if __name__ == '__main__':
+
+    # Load train data
     df = pd.read_json('data/train.jsonl', lines=True)
     data = df.text.values
     data = preprocess_data(data)
-    
 
-    
+    # Load validation data
+    val = pd.read_json('data/dev.jsonl', lines=True)
+    val_data = val.text.values
+    val_data = preprocess_data(val_data)
+
+    # Create Vocabulary
     TOP_WORDS = 1000
     vocab = Vocabulary(TOP_WORDS,"analysis.vocab")
     vocab.PrepareVocabulary(data)
+
+    # Convert text to int
+    val_int = vocab.TransformSentencesToId(val_data)
+    val['text_int'] = val_int
     text_int = vocab.TransformSentencesToId(data)
     df['text_int'] = text_int
 
+    # Train Test Split
     X_train, X_test, y_train, y_test = train_test_split(df.text_int.values, df.label.values)
+    X_val = val.text_int.values
+    y_val = val.label.values
 
-    
+    # Padding
     length_lst = [len(i) for i in df.text_int]
     max_sent_len = max(length_lst) # 47
     X_train = sequence.pad_sequences(X_train, maxlen=max_sent_len) 
     X_test = sequence.pad_sequences(X_test, maxlen=max_sent_len)
+    X_val = sequence.pad_sequences(X_val, maxlen=max_sent_len)
 
     model = define_lstm(TOP_WORDS, max_sent_len)
     model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=10, batch_size=64, verbose=2)
-    print(model.summary())
+
+    cv_auc = roc_auc_score(y_test, model.predict(X_test))
+    val_auc = roc_auc_score(y_val, model.predict(X_val))
+    print("AUC SCORE ON CROSS VALIDATION:\n {}".format(cv_auc))
+    print("\n\nAUC SCORE ON HOLDOUT:\n {}".format(val_auc))
+
+    testing = True
+    if testing:
+
+        sub_df = pd.read_json('data/test.jsonl', lines=True)
+        sub_data = sub_df.text.values
+        sub_int = vocab.TransformSentencesToId(sub_data)
+        sub_df['text_int'] = sub_int
+        X_sub = sub_df.text_int.values
+        X_sub = sequence.pad_sequences(X_sub, maxlen=max_sent_len)
+
+        thresh = .5
+
+        yhat = (thresh <= model.predict(X_sub)).astype(int)
+        y_proba = model.predict_proba(X_sub)
+        submission = pd.read_csv('data/blank_submission.csv')
+        submission.proba = y_proba
+        submission.label = yhat
+        submission.set_index('id', inplace=True)
+        submission.to_csv('data/lstm_submission.csv')
