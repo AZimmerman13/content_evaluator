@@ -67,7 +67,8 @@ class TextSubNet(nn.Module):
         Args:
             x: tensor of shape (batch_size, sequence_len, in_size)
         '''
-        _, final_states = self.rnn(x)
+        
+        _, final_states = self.rnn(x.view(85,1,1000)) # .view(64,1,1000)
         h = self.dropout(final_states[0].squeeze())
         y_1 = self.linear_1(h)
         return y_1
@@ -94,14 +95,15 @@ class TFN(nn.Module):
 
         # dimensions are specified in the order of img and text
         self.img_in = input_dims[0]
-        self.text_in = input_dims[1]
+        self.text_in = input_dims[1]  # 1000
         #self.text_in = input_dims[2]
+        
 
         self.img_hidden = hidden_dims[0]
         #self.video_hidden = hidden_dims[1]
-        self.text_hidden = hidden_dims[1]
-        self.text_out= text_out
-        self.post_fusion_dim = post_fusion_dim
+        self.text_hidden = hidden_dims[1] #128
+        self.text_out= text_out #64
+        self.post_fusion_dim = post_fusion_dim #64
 
         self.img_prob = dropouts[0]
         #self.video_prob = dropouts[1]
@@ -115,9 +117,9 @@ class TFN(nn.Module):
 
         # define the post_fusion layers
         self.post_fusion_dropout = nn.Dropout(p=self.post_fusion_prob)
-        self.post_fusion_layer_1 = nn.Linear((self.text_out + 1) * (self.video_hidden + 1) * (self.img_hidden + 1), self.post_fusion_dim)
-        self.post_fusion_layer_2 = nn.Linear(self.post_fusion_dim, self.post_fusion_dim)
-        self.post_fusion_layer_3 = nn.Linear(self.post_fusion_dim, 1)
+        self.post_fusion_layer_1 = nn.Linear((self.text_out + 1) * (self.img_hidden + 1), self.post_fusion_dim) #size IN:4225, OUT:32
+        self.post_fusion_layer_2 = nn.Linear(self.post_fusion_dim, self.post_fusion_dim) # IN: 32, OUT: 32
+        self.post_fusion_layer_3 = nn.Linear(self.post_fusion_dim, 1) # IN: 32, OUT:1
 
         # in TFN we are doing a regression with constrained output range: (-3, 3), hence we'll apply sigmoid to output
         # shrink it to (0, 1), and scale\shift it back to range (-3, 3)
@@ -147,9 +149,9 @@ class TFN(nn.Module):
 
         # _img_h has shape (batch_size, img_in + 1), _text_h has shape (batch_size, _text_in + 1)
         # we want to perform outer product between the two batch, hence we unsqueenze them to get
-        # (batch_size, audio_in + 1, 1) X (batch_size, 1, video_in + 1)
-        # fusion_tensor will have shape (batch_size, audio_in + 1, video_in + 1)
-        fusion_tensor = torch.bmm(_img_h.unsqueeze(2), _text_h.unsqueeze(1))
+        # (batch_size, img_in + 1, 1) X (batch_size, 1, text_in + 1)
+        # fusion_tensor will have shape (batch_size, img_in + 1, text_in + 1)
+        fusion_tensor = torch.bmm(_img_h.unsqueeze(2), _text_h.unsqueeze(1)).view(batch_size,-1)
         
         # next we do kronecker product between fusion_tensor and _text_h. This is even trickier
         # we have to reshape the fusion tensor during the computation
@@ -158,6 +160,7 @@ class TFN(nn.Module):
         # fusion_tensor = torch.bmm(fusion_tensor, _text_h.unsqueeze(1)).view(batch_size, -1)
 
         post_fusion_dropped = self.post_fusion_dropout(fusion_tensor)
+
         post_fusion_y_1 = F.relu(self.post_fusion_layer_1(post_fusion_dropped))
         post_fusion_y_2 = F.relu(self.post_fusion_layer_2(post_fusion_y_1))
         post_fusion_y_3 = F.sigmoid(self.post_fusion_layer_3(post_fusion_y_2))

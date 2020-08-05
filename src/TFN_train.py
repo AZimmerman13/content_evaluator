@@ -3,7 +3,7 @@ from TFN_model import TFN
 #from utils import MultimodalDataset
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
-from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score
 import os
 import argparse
 import torch
@@ -87,7 +87,8 @@ def preprocess(data_path):
     return train_set, valid_set, test_set, input_dims
 """
 
-def display(test_loss, test_binacc, test_precision, test_recall, test_f1, test_septacc, test_corr):
+def display(test_roc_auc, test_loss, test_binacc, test_precision, test_recall, test_f1, test_septacc, test_corr):
+    print("ROC AUC on test set is {}".format(test_roc_auc))
     print("MAE on test set is {}".format(test_loss))
     print("Binary accuracy on test set is {}".format(test_binacc))
     print("Precision on test set is {}".format(test_precision))
@@ -96,14 +97,17 @@ def display(test_loss, test_binacc, test_precision, test_recall, test_f1, test_s
     print("Seven-class accuracy on test set is {}".format(test_septacc))
     print("Correlation w.r.t human evaluation on test set is {}".format(test_corr))
 
-def main(options):
+def main():
     DTYPE = torch.FloatTensor
     train_labels, train_img, train_text, input_dims = preprocess('data/train.npy')
-    valid_labels, valid_img, valid_text, _ = preprocess('data/valid.npy')
+    valid_labels, valid_img, valid_text, _ = preprocess('data/validate.npy')
     test_labels, test_img, test_text, _ = preprocess('data/test.npy')
 
-    model = TFN(input_dims, (4, 16, 128), 64, (0.3, 0.3, 0.3, 0.3), 32)
-    if options['cuda']:
+    batch_sz = 85
+
+    model = TFN(input_dims, (64, 128), 64, (0.3, 0.3, 0.3), 32)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if device == 'cuda':
         model = model.cuda()
         DTYPE = torch.cuda.FloatTensor
     print("Model initialized")
@@ -113,14 +117,15 @@ def main(options):
     # setup training
     complete = True
     min_valid_loss = float('Inf')
-    batch_sz = 64
-    patience = options['patience']
+    
+    patience = 20
     epochs = 2
-    # model_path = options['model_path']
+    model_path = 'models/best_model.pth'
     
     train_set = list(zip(train_labels, train_img, train_text))
     valid_set = list(zip(valid_labels, valid_img, valid_text))
     test_set = list(zip(test_labels, test_img, test_text))
+
     
     train_iterator = DataLoader(train_set, batch_size=batch_sz, num_workers=4, shuffle=True)
     valid_iterator = DataLoader(valid_set, batch_size=len(valid_set), num_workers=4, shuffle=True)
@@ -134,15 +139,15 @@ def main(options):
             model.zero_grad()
 
             # the provided data has format [batch_size, seq_len, feature_dim] or [batch_size, 1, feature_dim]
-            x = batch[:-1]
+            # x = batch[:-1]
             # x_a = Variable(x[0].float().type(DTYPE), requires_grad=False).squeeze()
-            x_i = img.float().type(DTYPE), requires_grad=False).squeeze()
-            x_t = text.float().type(DTYPE), requires_grad=False)
-            y = labels.view(-1, 1).float().type(DTYPE), requires_grad=False)
+            x_i = Variable(img.float().type(DTYPE), requires_grad=False).squeeze()
+            x_t = Variable(text.float().type(DTYPE), requires_grad=False)
+            y = Variable(labels.view(-1, 1).float().type(DTYPE), requires_grad=False)
             output = model(x_i, x_t)
             loss = criterion(output, y)
             loss.backward()
-            train_loss += loss.data[0] / len(train_set)
+            train_loss += loss.item() / len(train_set)
             optimizer.step()
 
         print("Epoch {} complete! Average Training loss: {}".format(e, train_loss))
@@ -155,13 +160,13 @@ def main(options):
 
         # On validation set we don't have to compute metrics other than MAE and accuracy
         model.eval()
-        for batch in valid_iterator:
-            x = batch[:-1]
-            x_a = Variable(x[0].float().type(DTYPE), requires_grad=False).squeeze()
-            x_v = Variable(x[1].float().type(DTYPE), requires_grad=False).squeeze()
-            x_t = Variable(x[2].float().type(DTYPE), requires_grad=False)
-            y = Variable(batch[-1].view(-1, 1).float().type(DTYPE), requires_grad=False)
-            output = model(x_a, x_v, x_t)
+        for labels, img, text in valid_iterator:
+            # x = batch[:-1]
+            # x_a = Variable(x[0].float().type(DTYPE), requires_grad=False).squeeze()
+            x_i = Variable(img.float().type(DTYPE), requires_grad=False).squeeze()
+            x_t = Variable(text.float().type(DTYPE), requires_grad=False)
+            y = Variable(labels.view(-1, 1).float().type(DTYPE), requires_grad=False)
+            output = model(x_i, x_t)
             valid_loss = criterion(output, y)
         output_valid = output.cpu().data.numpy().reshape(-1)
         y = y.cpu().data.numpy().reshape(-1)
@@ -171,15 +176,18 @@ def main(options):
             complete = False
             break
 
-        valid_binacc = accuracy_score(output_valid>=0, y>=0)
+        # valid_binacc = accuracy_score(output_valid>=0, y>=0)
+        valid_binacc = accuracy_score(output_valid>=0.5, y)
+        roc_auc = roc_auc_score(output_valid, y)
 
         print("Validation loss is: {}".format(valid_loss.data[0] / len(valid_set)))
         print("Validation binary accuracy is: {}".format(valid_binacc))
+        print("ROC AUC is: {}".format(roc_auc))
 
         if (valid_loss.data[0] < min_valid_loss):
             curr_patience = patience
             min_valid_loss = valid_loss.data[0]
-            torch.save(model, model_path)
+            torch.save(model.state_dict(), model_path)
             print("Found new best model, saving to disk...")
         else:
             curr_patience -= 1
@@ -189,35 +197,38 @@ def main(options):
         print("\n\n")
 
     if complete:
-        
-        best_model = torch.load(model_path)
+        state_dict = torch.load(model_path)
+        best_model = model.load_state_dict(state_dict)
+        # best_model = torch.load(model_path)
         best_model.eval()
-        for batch in test_iterator:
-            x = batch[:-1]
-            x_a = Variable(x[0].float().type(DTYPE), requires_grad=False).squeeze()
-            x_v = Variable(x[1].float().type(DTYPE), requires_grad=False).squeeze()
-            x_t = Variable(x[2].float().type(DTYPE), requires_grad=False)
-            y = Variable(batch[-1].view(-1, 1).float().type(DTYPE), requires_grad=False)
-            output_test = best_model(x_a, x_v, x_t)
+        for img, text, labels in test_iterator:
+            # x = batch[:-1]
+            # x_a = Variable(x[0].float().type(DTYPE), requires_grad=False).squeeze()
+            x_i = Variable(img.float().type(DTYPE), requires_grad=False).squeeze()
+            x_t = Variable(text.float().type(DTYPE), requires_grad=False)
+            y = Variable(labels.view(-1, 1).float().type(DTYPE), requires_grad=False)
+            output_test = best_model(x_i, x_t)
             loss_test = criterion(output_test, y)
-            test_loss = loss_test.data[0]
+            test_loss = loss_test.item()
         output_test = output_test.cpu().data.numpy().reshape(-1)
         y = y.cpu().data.numpy().reshape(-1)
 
-        test_binacc = accuracy_score(output_test>=0, y>=0)
-        test_precision, test_recall, test_f1, _ = precision_recall_fscore_support(y>=0, output_test>=0, average='binary')
+        test_binacc = accuracy_score(output_test>=0.5, y)
+        test_precision, test_recall, test_f1, _ = precision_recall_fscore_support(y, output_test>=0.5, average='binary')
         test_septacc = (output_test.round() == y.round()).mean()
+        test_roc_auc = roc_auc_score(output_test, y)
 
         # compute the correlation between true and predicted scores
         test_corr = np.corrcoef([output_test, y])[0][1]  # corrcoef returns a matrix
         test_loss = test_loss / len(test_set)
+        
 
-        display(test_loss, test_binacc, test_precision, test_recall, test_f1, test_septacc, test_corr)
+        display(test_roc_auc, test_loss, test_binacc, test_precision, test_recall, test_f1, test_septacc, test_corr)
     return
 
 
 if __name__ == "__main__":
-    pass
+    
 #     OPTIONS = argparse.ArgumentParser()
 #     OPTIONS.add_argument('--dataset', dest='dataset',
 #                          type=str, default='MOSI')
@@ -229,4 +240,4 @@ if __name__ == "__main__":
 #                          type=str, default='models')
 #     OPTIONS.add_argument('--max_len', dest='max_len', type=int, default=20)
 #     PARAMS = vars(OPTIONS.parse_args())
-#     main(PARAMS)
+    main()
