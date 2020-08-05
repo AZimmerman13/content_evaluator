@@ -58,18 +58,18 @@ def define_mlp_model(n_input):
         a defined mlp model, not fitted
     """
     model = Sequential()
-    num_neurons = 64  #256
+    num_neurons = 256  #256
 
     # hidden layer
     model.add(Dense(units=num_neurons,
                     input_dim=n_input,
                     kernel_initializer='he_uniform',
-                    activation = 'relu'))
-    model.add(Dense(units=num_neurons,
-                    activation = 'relu')) 
+                    activation = 'sigmoid'))
+    model.add(Dense(units=num_neurons*2,
+                    activation = 'sigmoid')) 
     model.add(Dropout(0.3))
-    model.add(Dense(units=num_neurons,
-                    activation = 'relu')) 
+    model.add(Dense(units=num_neurons*2,
+                    activation = 'sigmoid')) 
     model.add(Dropout(0.3))
                    
     # output layer

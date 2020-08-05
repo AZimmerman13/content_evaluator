@@ -1,5 +1,5 @@
 # content_evaluator
-By Taylor Britt, Allison Zhou, and Austin Zimmerman
+By Allison Zhou and Austin Zimmerman
 
 ## *THIS PROJECT IS IN PROGRESS, WE WILL BE UPDATING PERIODICALLY AS WE ATTEMPT DIFFERENT STRATEGIES AND OUR RESULTS IMPROVE*
 ``` 

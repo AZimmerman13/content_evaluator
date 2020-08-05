@@ -11,10 +11,25 @@ import random
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
+import pandas as pd
 
 
 def preprocess(data_path):
     data = np.load(data_path)
+    labels = data[:,0]
+    text = data[:, 1:1001]
+    img = data[:,1001:]
+
+    img_dim = img.shape[1]
+    print("Image feature dimension is: {}".format(img_dim))
+    text_dim = text.shape[1]
+    print("Text feature dimension is: {}".format(text_dim))
+
+    input_dims = (img_dim, text_dim)
+    d = {'labels':labels, 'img':img, 'text':text}
+    # output = pd.DataFrame(data=d)
+
+    return labels, img, text, input_dims
     
     """
     # parse the input args
@@ -83,7 +98,9 @@ def display(test_loss, test_binacc, test_precision, test_recall, test_f1, test_s
 
 def main(options):
     DTYPE = torch.FloatTensor
-    train_set, valid_set, test_set, input_dims = preprocess(options)
+    train_labels, train_img, train_text, input_dims = preprocess('data/train.npy')
+    valid_labels, valid_img, valid_text, _ = preprocess('data/valid.npy')
+    test_labels, test_img, test_text, _ = preprocess('data/test.npy')
 
     model = TFN(input_dims, (4, 16, 128), 64, (0.3, 0.3, 0.3, 0.3), 32)
     if options['cuda']:
@@ -96,28 +113,33 @@ def main(options):
     # setup training
     complete = True
     min_valid_loss = float('Inf')
-    batch_sz = options['batch_size']
+    batch_sz = 64
     patience = options['patience']
-    epochs = options['epochs']
-    model_path = options['model_path']
+    epochs = 2
+    # model_path = options['model_path']
+    
+    train_set = list(zip(train_labels, train_img, train_text))
+    valid_set = list(zip(valid_labels, valid_img, valid_text))
+    test_set = list(zip(test_labels, test_img, test_text))
+    
     train_iterator = DataLoader(train_set, batch_size=batch_sz, num_workers=4, shuffle=True)
     valid_iterator = DataLoader(valid_set, batch_size=len(valid_set), num_workers=4, shuffle=True)
     test_iterator = DataLoader(test_set, batch_size=len(test_set), num_workers=4, shuffle=True)
-    curr_patience = patience
+    # curr_patience = patience
     for e in range(epochs):
         model.train()
         model.zero_grad()
         train_loss = 0.0
-        for batch in train_iterator:
+        for labels, img, text in train_iterator:
             model.zero_grad()
 
             # the provided data has format [batch_size, seq_len, feature_dim] or [batch_size, 1, feature_dim]
             x = batch[:-1]
-            x_a = Variable(x[0].float().type(DTYPE), requires_grad=False).squeeze()
-            x_v = Variable(x[1].float().type(DTYPE), requires_grad=False).squeeze()
-            x_t = Variable(x[2].float().type(DTYPE), requires_grad=False)
-            y = Variable(batch[-1].view(-1, 1).float().type(DTYPE), requires_grad=False)
-            output = model(x_a, x_v, x_t)
+            # x_a = Variable(x[0].float().type(DTYPE), requires_grad=False).squeeze()
+            x_i = img.float().type(DTYPE), requires_grad=False).squeeze()
+            x_t = text.float().type(DTYPE), requires_grad=False)
+            y = labels.view(-1, 1).float().type(DTYPE), requires_grad=False)
+            output = model(x_i, x_t)
             loss = criterion(output, y)
             loss.backward()
             train_loss += loss.data[0] / len(train_set)
@@ -194,7 +216,8 @@ def main(options):
     return
 
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
+    pass
 #     OPTIONS = argparse.ArgumentParser()
 #     OPTIONS.add_argument('--dataset', dest='dataset',
 #                          type=str, default='MOSI')

@@ -17,7 +17,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler 
 from sklearn.metrics import accuracy_score, roc_auc_score
 
-class Vocabulary:
+class Vocabulary: # Credit http://www.insightsbot.com/keras-lstm-example-sequence-binary-classification/
     
     def __init__(self, vocabulary, wordFrequencyFilePath):
         self.vocabulary = vocabulary
@@ -113,12 +113,29 @@ def RemoveStopWords(line, stopwords):
 def define_lstm(TOP_WORDS, max_sent_len):
     embedding_vector_length = 16
     model = Sequential()
+    num_neurons = 16
+    # Input layer
     model.add(Embedding(TOP_WORDS, 
                         embedding_vector_length, 
                         input_length=max_sent_len))
 
-    model.add(LSTM(100))
-    model.add(Dropout(0.5))
+    model.add(LSTM(16, return_sequences=True))
+    model.add(Dropout(0.4))
+
+    model.add(LSTM(16))
+    model.add(Dropout(0.4))
+
+    # model.add(Dense(units=num_neurons,
+    #                 activation = 'sigmoid'))
+    # model.add(Dropout(0.3))
+
+    model.add(Dense(units=num_neurons,
+                    activation = 'relu'))
+    model.add(Dropout(0.4))
+
+
+    
+    # Output layer
     model.add(Dense(1, 
                     activation='sigmoid'))
 
@@ -181,7 +198,7 @@ if __name__ == '__main__':
     print("AUC SCORE ON CROSS VALIDATION:\n {}".format(cv_auc))
     print("\n\nAUC SCORE ON HOLDOUT:\n {}".format(val_auc))
 
-    testing = True
+    testing = False
     if testing:
 
         sub_df = pd.read_json('data/test.jsonl', lines=True)
@@ -199,4 +216,5 @@ if __name__ == '__main__':
         submission.proba = y_proba
         submission.label = yhat
         submission.set_index('id', inplace=True)
+        submission.drop('Unnamed: 0', inplace=True, axis=1)
         submission.to_csv('data/lstm_submission.csv')
