@@ -119,7 +119,7 @@ def main():
     min_valid_loss = float('Inf')
     
     patience = 20
-    epochs = 2
+    epochs = 10
     model_path = 'models/best_model.pth'
     
     train_set = list(zip(train_labels, train_img, train_text))
@@ -171,22 +171,23 @@ def main():
         output_valid = output.cpu().data.numpy().reshape(-1)
         y = y.cpu().data.numpy().reshape(-1)
 
-        if np.isnan(valid_loss.data[0]):
+        if np.isnan(valid_loss.item()):
             print("Training got into NaN values...\n\n")
             complete = False
             break
 
         # valid_binacc = accuracy_score(output_valid>=0, y>=0)
         valid_binacc = accuracy_score(output_valid>=0.5, y)
-        roc_auc = roc_auc_score(output_valid, y)
+        #zbreakpoint()
+        roc_auc = roc_auc_score(y, output_valid)
 
-        print("Validation loss is: {}".format(valid_loss.data[0] / len(valid_set)))
+        print("Validation loss is: {}".format(valid_loss.item() / len(valid_set)))
         print("Validation binary accuracy is: {}".format(valid_binacc))
         print("ROC AUC is: {}".format(roc_auc))
 
-        if (valid_loss.data[0] < min_valid_loss):
+        if (valid_loss.item() < min_valid_loss):
             curr_patience = patience
-            min_valid_loss = valid_loss.data[0]
+            min_valid_loss = valid_loss.item()
             torch.save(model.state_dict(), model_path)
             print("Found new best model, saving to disk...")
         else:
@@ -195,19 +196,19 @@ def main():
         if curr_patience <= 0:
             break
         print("\n\n")
-
+    '''
     if complete:
         state_dict = torch.load(model_path)
-        best_model = model.load_state_dict(state_dict)
+        model.load_state_dict(state_dict)
         # best_model = torch.load(model_path)
-        best_model.eval()
+        model.eval()
         for img, text, labels in test_iterator:
             # x = batch[:-1]
             # x_a = Variable(x[0].float().type(DTYPE), requires_grad=False).squeeze()
             x_i = Variable(img.float().type(DTYPE), requires_grad=False).squeeze()
             x_t = Variable(text.float().type(DTYPE), requires_grad=False)
             y = Variable(labels.view(-1, 1).float().type(DTYPE), requires_grad=False)
-            output_test = best_model(x_i, x_t)
+            output_test = model(x_i, x_t)
             loss_test = criterion(output_test, y)
             test_loss = loss_test.item()
         output_test = output_test.cpu().data.numpy().reshape(-1)
@@ -216,14 +217,14 @@ def main():
         test_binacc = accuracy_score(output_test>=0.5, y)
         test_precision, test_recall, test_f1, _ = precision_recall_fscore_support(y, output_test>=0.5, average='binary')
         test_septacc = (output_test.round() == y.round()).mean()
-        test_roc_auc = roc_auc_score(output_test, y)
+        test_roc_auc = roc_auc_score(y, output_test)
 
         # compute the correlation between true and predicted scores
         test_corr = np.corrcoef([output_test, y])[0][1]  # corrcoef returns a matrix
         test_loss = test_loss / len(test_set)
         
-
         display(test_roc_auc, test_loss, test_binacc, test_precision, test_recall, test_f1, test_septacc, test_corr)
+    '''
     return
 
 
